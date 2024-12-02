@@ -1,7 +1,7 @@
 <p align="center">
  <h2 align="center">ClassicCounter Launcher</h2>
  <p align="center">
-   Launcher for ClassicCounter with Discord RPC, Auto-Updates and more!
+   Launcher for ClassicCounter with Discord RPC, Auto-Updates and More!
    <br/>
    Written in C# using .NET 8.
  </p>
