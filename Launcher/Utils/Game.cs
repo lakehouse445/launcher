@@ -22,9 +22,17 @@ namespace Launcher.Utils
             if (arguments.Count > 0) Terminal.Print($"Arguments: {string.Join(" ", arguments)}");
 
             string directory = Directory.GetCurrentDirectory();
-            string gameStatePath = $"{directory}/csgo/cfg/gamestate_integration_cc.cfg";
             Terminal.Print($"Directory: {directory}");
 
+            if (!File.Exists($"{directory}/csgo.exe"))
+            {
+                Terminal.Error("csgo.exe doesn't exist! Closing launcher in 10 seconds.");
+                await Task.Delay(10000);
+                Environment.Exit(1);
+            }
+
+            string gameStatePath = $"{directory}/csgo/cfg/gamestate_integration_cc.cfg";
+            
             if (!Argument.Exists("--disable-rpc"))
             {
                 _port = GeneratePort();
@@ -62,13 +70,6 @@ namespace Launcher.Utils
                 );
             }
             else if (File.Exists(gameStatePath)) File.Delete(gameStatePath);
-
-            if (!File.Exists($"{directory}/csgo.exe"))
-            {
-                Terminal.Error("csgo.exe doesn't exist! Closing launcher in 10 seconds.");
-                await Task.Delay(10000);
-                Environment.Exit(1);
-            }
 
             _process = new Process();
             _process.StartInfo.FileName = $"{directory}/csgo.exe";
