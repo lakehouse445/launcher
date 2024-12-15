@@ -1,4 +1,5 @@
 ﻿using Downloader;
+using SevenZipExtractor;
 
 namespace Launcher.Utils
 {
@@ -21,10 +22,29 @@ namespace Launcher.Utils
 
         public static async Task DownloadPatch(Patch patch)
         {
+            string originalFileName = patch.File.EndsWith(".7z") ? patch.File[..^3] : patch.File;
+            string downloadPath = $"{Directory.GetCurrentDirectory()}/{patch.File}";
+
             await _downloader.DownloadFileTaskAsync(
                 $"https://patch.classiccounter.cc/{patch.File}",
                 $"{Directory.GetCurrentDirectory()}/{patch.File}"
             );
+
+            if (patch.File.EndsWith(".7z"))
+            {
+                string extractPath = $"{Directory.GetCurrentDirectory()}/{originalFileName}";
+                await Extract7z(downloadPath, extractPath);
+            }
+        }
+
+        private static async Task Extract7z(string archivePath, string outputPath)
+        {
+            using (var archiveFile = new ArchiveFile(archivePath))
+            {
+                await Task.Run(() => archiveFile.Extract(Path.GetDirectoryName(outputPath)));
+            }
+            // Delete the .7z file after extraction
+            File.Delete(archivePath);
         }
     }
 }

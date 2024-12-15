@@ -22,6 +22,11 @@ namespace Launcher.Utils
 
     public static class PatchManager
     {
+        private static string GetOriginalFileName(string fileName)
+        {
+            return fileName.EndsWith(".7z") ? fileName[..^3] : fileName;
+        }
+
         private static async Task<List<Patch>> GetPatches()
         {
             List<Patch> patches = new List<Patch>();
@@ -62,14 +67,14 @@ namespace Launcher.Utils
 
             foreach (Patch patch in patches)
             {
-                string path = $"{Directory.GetCurrentDirectory()}/{patch.File}";
+                string originalFileName = GetOriginalFileName(patch.File);
+                string path = $"{Directory.GetCurrentDirectory()}/{originalFileName}";
                 string serverHash = patch.Hash;
 
                 if (!File.Exists(path))
                 {
                     if (Debug.Enabled())
-                        Terminal.Debug($"Missing file: {patch.File}");
-
+                        Terminal.Debug($"Missing file: {originalFileName}");
                     missing.Add(patch);
                     continue;
                 }
@@ -81,15 +86,14 @@ namespace Launcher.Utils
                         if (clientHash != serverHash)
                         {
                             if (Debug.Enabled())
-                                Terminal.Debug($"Outdated file: {patch.File}");
-
+                                Terminal.Debug($"Outdated file: {originalFileName}");
+                            File.Delete(path);
                             outdated.Add(patch);
                         }
                     }
                     catch { continue; }
                 }
             }
-
             return new Patches(patches.Count > 0, missing, outdated);
         }
     }
