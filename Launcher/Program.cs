@@ -162,6 +162,35 @@ if (!Argument.Exists("--skip-validating"))
             if (notDownloaded > 0)
                 Terminal.Warning($"Couldn't download {notDownloaded} outdated patches.");
         }
+
+        // Cleanup temporary files
+        if (Debug.Enabled())
+            Terminal.Debug("Cleaning up temporary files...");
+
+        try
+        {
+            // Try to delete the 7z.dll
+            string launcherDllPath = Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? "", "7z.dll");
+            if (File.Exists(launcherDllPath))
+            {
+                try
+                {
+                    File.Delete(launcherDllPath);
+                    if (Debug.Enabled())
+                        Terminal.Debug($"Deleted 7z.dll: {launcherDllPath}");
+                }
+                catch (Exception ex)
+                {
+                    if (Debug.Enabled())
+                        Terminal.Debug($"Failed to delete 7z.dll: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (Debug.Enabled())
+                Terminal.Debug($"Cleanup failed: {ex.Message}");
+        }
     });
 }
 
