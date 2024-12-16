@@ -9,6 +9,15 @@
             "--skip-validating",
         };
 
+        private static List<string> _additionalArguments = new();
+        public static void AddArgument(string argument)
+        {
+            if (!_additionalArguments.Contains(argument.ToLowerInvariant()))
+            {
+                _additionalArguments.Add(argument.ToLowerInvariant());
+            }
+        }
+
         public static bool Exists(string argument)
         {
             IEnumerable<string> arguments = Environment.GetCommandLineArgs();
@@ -29,6 +38,7 @@
                     && !arg.EndsWith(".exe"))
                     gameArguments.Add(arg.ToLowerInvariant());
 
+            gameArguments.AddRange(_additionalArguments);
             return gameArguments;
         }
     }

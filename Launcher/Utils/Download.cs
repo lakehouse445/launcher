@@ -104,6 +104,10 @@ namespace Launcher.Utils
 
                     if (Debug.Enabled())
                         Terminal.Debug("Extraction completed successfully!");
+
+                    // you will likely be downloading new .vpk files
+                    // rebuild audio cache for the audio to not earrape you incase we replaced any sounds in them
+                    Argument.AddArgument("+snd_rebuildaudiocache");
                 }
 
                 // delete 7z after extract
