@@ -25,6 +25,20 @@ namespace Launcher.Utils
             string originalFileName = patch.File.EndsWith(".7z") ? patch.File[..^3] : patch.File;
             string downloadPath = $"{Directory.GetCurrentDirectory()}/{patch.File}";
 
+            // if you found a compressed 7z of the file that ur trying to download already, delete it (probably cancelled partial download, its junk)
+            if (patch.File.EndsWith(".7z") && File.Exists(downloadPath))
+            {
+                try
+                {
+                    File.Delete(downloadPath);
+                }
+                catch
+                {
+                    if (Debug.Enabled())
+                        Terminal.Debug($"Failed to delete existing .7z file: {patch.File}");
+                }
+            }
+
             await _downloader.DownloadFileTaskAsync(
                 $"https://patch.classiccounter.cc/{patch.File}",
                 $"{Directory.GetCurrentDirectory()}/{patch.File}"
