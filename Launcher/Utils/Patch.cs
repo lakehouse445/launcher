@@ -65,35 +65,99 @@ namespace Launcher.Utils
             List<Patch> missing = new();
             List<Patch> outdated = new();
 
-            foreach (Patch patch in patches)
-            {
-                string originalFileName = GetOriginalFileName(patch.File);
-                string path = $"{Directory.GetCurrentDirectory()}/{originalFileName}";
-                string serverHash = patch.Hash;
+            // find pak01_dir.vpk from patch api
+            var dirPatch = patches.FirstOrDefault(p =>
+                p.File.Contains("pak01_dir.vpk"));
 
-                if (!File.Exists(path))
+            bool needPak01Update = false;
+
+            if (dirPatch != null)
+            {
+                string dirPath = $"{Directory.GetCurrentDirectory()}/csgo/pak01_dir.vpk";
+                Terminal.Debug("Checking csgo/pak01_dir.vpk first...");
+
+                if (File.Exists(dirPath))
                 {
-                    if (Debug.Enabled())
-                        Terminal.Debug($"Missing file: {originalFileName}");
-                    missing.Add(patch);
-                    continue;
+                    Terminal.Debug("Checking hash for: csgo/pak01_dir.vpk");
+                    string dirHash = await GetHash(dirPath);
+                    if (dirHash != dirPatch.Hash)
+                    {
+                        Terminal.Debug("csgo/pak01_dir.vpk is outdated!");
+                        File.Delete(dirPath);
+                        outdated.Add(dirPatch);
+                        needPak01Update = true;
+                    }
+                    else
+                    {
+                        Terminal.Debug("csgo/pak01_dir.vpk is up to date - will skip pak01 files");
+                    }
                 }
                 else
                 {
-                    try
+                    Terminal.Debug("Missing: csgo/pak01_dir.vpk");
+                    missing.Add(dirPatch);
+                    needPak01Update = true;
+                }
+            }
+
+            foreach (Patch patch in patches)
+            {
+                string originalFileName = GetOriginalFileName(patch.File);
+
+                // skip dir file (we already checked it)
+                if (originalFileName.Contains("pak01_dir.vpk"))
+                    continue;
+
+                // are you a pak01 file?
+                bool isPak01File = originalFileName.Contains("pak01_");
+
+                string path = $"{Directory.GetCurrentDirectory()}/{originalFileName}";
+
+                if (isPak01File)
+                {
+                    if (!File.Exists(path))
                     {
-                        string clientHash = await GetHash(path);
-                        if (clientHash != serverHash)
+                        Terminal.Debug($"Missing: {originalFileName}");
+                        missing.Add(patch);
+                        continue;
+                    }
+
+                    if (needPak01Update)
+                    {
+                        Terminal.Debug($"Checking hash for: {originalFileName} (pak01_dir.vpk was outdated)");
+                        string hash = await GetHash(path);
+                        if (hash != patch.Hash)
                         {
-                            if (Debug.Enabled())
-                                Terminal.Debug($"Outdated file: {originalFileName}");
+                            Terminal.Debug($"Outdated: {originalFileName}");
                             File.Delete(path);
                             outdated.Add(patch);
                         }
                     }
-                    catch { continue; }
+                    else
+                    {
+                        Terminal.Debug($"Skipping hash check for: {originalFileName} (pak01_dir.vpk up to date)");
+                    }
+                }
+                else
+                {
+                    if (!File.Exists(path))
+                    {
+                        Terminal.Debug($"Missing: {originalFileName}");
+                        missing.Add(patch);
+                        continue;
+                    }
+
+                    Terminal.Debug($"Checking hash for: {originalFileName}");
+                    string hash = await GetHash(path);
+                    if (hash != patch.Hash)
+                    {
+                        Terminal.Debug($"Outdated: {originalFileName}");
+                        File.Delete(path);
+                        outdated.Add(patch);
+                    }
                 }
             }
+
             return new Patches(patches.Count > 0, missing, outdated);
         }
     }
