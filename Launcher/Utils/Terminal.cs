@@ -10,7 +10,8 @@ namespace Launcher.Utils
 
         public static void Init()
         {
-            AnsiConsole.MarkupLine($"{_prefix} {_seperator} [{_grey}]Launcher maintained by Ollum/heapy[/]");
+            AnsiConsole.MarkupLine($"{_prefix} {_seperator} [{_grey}]Launcher maintained by [/][mediumspringgreen]Ollum[/][{_grey}][/]");
+            AnsiConsole.MarkupLine($"{_prefix} {_seperator} [{_grey}]Coded with love by [/][lightcoral]heapy <3[/][{_grey}][/]");
             AnsiConsole.MarkupLine($"{_prefix} {_seperator} [{_grey}]https://github.com/ClassicCounter [/]");
             AnsiConsole.MarkupLine($"{_prefix} {_seperator} [{_grey}]Version: {Version.Current}[/]");
         }

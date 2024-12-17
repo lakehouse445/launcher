@@ -140,7 +140,7 @@ if (!Argument.Exists("--skip-validating"))
 
             foreach (Patch patch in patches.Outdated)
             {
-                ctx.Status = $"Downloading outdated patches. | {downloaded} / {patchCount}";
+                ctx.Status = $"Downloading current patches. | {downloaded} / {patchCount}";
 
                 try
                 {
@@ -153,14 +153,14 @@ if (!Argument.Exists("--skip-validating"))
                     notDownloaded++;
 
                     if (Debug.Enabled())
-                        Terminal.Debug($"Couldn't download outdated patch: {patch.File}, possibly due to missing permissions.");
+                        Terminal.Debug($"Couldn't download current patch: {patch.File}, possibly due to missing permissions.");
                 }
 
                 await Task.Delay(250);
             }
 
             if (notDownloaded > 0)
-                Terminal.Warning($"Couldn't download {notDownloaded} outdated patches.");
+                Terminal.Warning($"Couldn't download {notDownloaded} current patches!");
         }
 
         // Cleanup temporary files
