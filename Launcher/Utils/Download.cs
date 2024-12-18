@@ -90,10 +90,6 @@ namespace Launcher.Utils
                     if (Debug.Enabled())
                         Terminal.Debug($"Downloaded 7z.dll to: {launcherDllPath}");
                 }
-                else if (Debug.Enabled())
-                {
-                    Terminal.Debug($"Using existing 7z.dll from: {launcherDllPath}");
-                }
 
                 using (var archiveFile = new ArchiveFile(archivePath, launcherDllPath))
                 {

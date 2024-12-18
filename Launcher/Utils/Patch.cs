@@ -64,11 +64,10 @@ namespace Launcher.Utils
 
             List<Patch> missing = new();
             List<Patch> outdated = new();
+            Patch? dirPatch = null;
 
             // find pak01_dir.vpk from patch api
-            var dirPatch = patches.FirstOrDefault(p =>
-                p.File.Contains("pak01_dir.vpk"));
-
+            dirPatch = patches.FirstOrDefault(p => p.File.Contains("pak01_dir.vpk"));
             bool needPak01Update = false;
 
             if (dirPatch != null)
@@ -106,6 +105,11 @@ namespace Launcher.Utils
 
                     missing.Add(dirPatch);
                     needPak01Update = true;
+                }
+
+                if (needPak01Update)
+                {
+                    patches.Remove(dirPatch);
                 }
             }
 
@@ -178,6 +182,15 @@ namespace Launcher.Utils
                         outdated.Add(patch);
                     }
                 }
+            }
+
+            // if pak01_dir.vpk needs update, move it to end of lists
+            if (needPak01Update && dirPatch != null)
+            {
+                if (outdated.Remove(dirPatch))
+                    outdated.Add(dirPatch);
+                if (missing.Remove(dirPatch))
+                    missing.Add(dirPatch);
             }
 
             return new Patches(patches.Count > 0, missing, outdated);

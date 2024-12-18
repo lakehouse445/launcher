@@ -22,8 +22,8 @@
 - `--disable-rpc` - Disables Discord RPC.
 
 > [!CAUTION]
-> **Using `--skip-updates` or `--skip-validating` is NOT recommended.**  
-> **Outdated launcher or patches might cause issues.**
+> **Using `--skip-updates` or `--skip-validating` is NOT recommended!**  
+> **An outdated launcher or patches might cause issues.**
 
 ## Packages Used
 - [CSGSI](https://github.com/rakijah/CSGSI) by [rakijah](https://github.com/rakijah)
