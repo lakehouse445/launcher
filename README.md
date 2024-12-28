@@ -19,6 +19,7 @@
 - `--debug-mode` - Enables debug mode, prints additional info.
 - `--skip-updates` - Skips checking for launcher updates.
 - `--skip-validating` - Skips validating patches.
+- `--patch-only` - Will only check for patches, won't open the game.
 - `--disable-rpc` - Disables Discord RPC.
 
 > [!CAUTION]
