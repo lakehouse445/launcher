@@ -194,6 +194,14 @@ if (!Argument.Exists("--skip-validating"))
     });
 }
 
+if (Argument.Exists("--patch-only"))
+{
+    Terminal.Success("Finished patch validation and downloads! Closing launcher.");
+    await Task.Delay(3000);
+    Environment.Exit(0);
+    return;
+}
+
 bool launched = await Game.Launch();
 if (!launched)
 {

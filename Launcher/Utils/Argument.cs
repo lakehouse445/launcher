@@ -7,6 +7,7 @@
             "--debug-mode",
             "--skip-updates",
             "--skip-validating",
+            "--patch-only"
         };
 
         private static List<string> _additionalArguments = new();
