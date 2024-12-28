@@ -76,19 +76,62 @@ namespace Launcher.Utils
                 }
 
                 string launcherDllPath = Path.Combine(launcherDir, "7z.dll");
-
-                if (!File.Exists(launcherDllPath))
+                bool dllDownloaded = false;
+                int retryCount = 0;
+                string[] fallbackUrls = new[]
                 {
-                    if (Debug.Enabled())
-                        Terminal.Debug($"7z.dll not found, downloading...");
+                    "https://ollumhd.github.io/7z.dll",
+                    "https://fastdl.classiccounter.cc/7z.dll"
+                    // add more fallback URLs if needed...
+                };
 
-                    await _downloader.DownloadFileTaskAsync(
-                        "https://ollumhd.github.io/7z.dll",
-                        launcherDllPath
-                    );
+                while (!dllDownloaded && retryCount < 10)
+                {
+                    if (!File.Exists(launcherDllPath))
+                    {
+                        if (Debug.Enabled())
+                            Terminal.Debug($"7z.dll not found, downloading... (Attempt {retryCount + 1}/10)");
 
-                    if (Debug.Enabled())
-                        Terminal.Debug($"Downloaded 7z.dll to: {launcherDllPath}");
+                        try
+                        {
+                            await _downloader.DownloadFileTaskAsync(
+                                fallbackUrls[retryCount % fallbackUrls.Length],
+                                launcherDllPath
+                            );
+
+                            if (File.Exists(launcherDllPath))
+                            {
+                                dllDownloaded = true;
+                                if (Debug.Enabled())
+                                    Terminal.Debug($"Downloaded 7z.dll to: {launcherDllPath}");
+                            }
+                            else
+                            {
+                                Terminal.Error($"Failed to download 7z.dll! Trying again... (Attempt {retryCount + 1})");
+                                retryCount++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            if (Debug.Enabled())
+                                Terminal.Debug($"Failed to download 7z.dll: {ex.Message}");
+                            retryCount++;
+                        }
+
+                        if (retryCount > 0)
+                            await Task.Delay(1000); // wait 1 sec per retry
+                    }
+                    else
+                    {
+                        dllDownloaded = true;
+                    }
+                }
+
+                if (!dllDownloaded)
+                {
+                    Terminal.Error("Couldn't download 7z.dll! Launcher will close in 5 seconds...");
+                    await Task.Delay(5000);
+                    Environment.Exit(1);
                 }
 
                 using (var archiveFile = new ArchiveFile(archivePath, launcherDllPath))
@@ -101,9 +144,7 @@ namespace Launcher.Utils
                     if (Debug.Enabled())
                         Terminal.Debug("Extraction completed successfully!");
 
-                    // you will likely be downloading new .vpk files
-                    // rebuild audio cache for the audio to not earrape you incase we replaced any sounds in them
-                    Argument.AddArgument("+snd_rebuildaudiocache");
+                    Argument.AddArgument("+snd_mixahead 0.1");
                 }
 
                 // delete 7z after extract
@@ -121,8 +162,7 @@ namespace Launcher.Utils
             }
             catch (Exception ex)
             {
-                if (Debug.Enabled())
-                    Terminal.Debug($"Extraction failed: {ex.Message}\nStack trace: {ex.StackTrace}");
+                Terminal.Error($"Extraction failed: {ex.Message}\nStack trace: {ex.StackTrace}");
                 throw;
             }
         }
