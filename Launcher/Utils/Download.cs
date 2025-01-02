@@ -20,7 +20,7 @@ namespace Launcher.Utils
             );
         }
 
-        public static async Task DownloadPatch(Patch patch)
+        public static async Task DownloadPatch(Patch patch, Action<DownloadProgressChangedEventArgs>? onProgress = null, Action? onExtract = null)
         {
             string originalFileName = patch.File.EndsWith(".7z") ? patch.File[..^3] : patch.File;
             string downloadPath = $"{Directory.GetCurrentDirectory()}/{patch.File}";
@@ -28,7 +28,6 @@ namespace Launcher.Utils
             if (Debug.Enabled())
                 Terminal.Debug($"Starting download of: {patch.File}");
 
-            // if you found a compressed 7z of the file that ur trying to download already, delete it (probably cancelled partial download, its junk)
             if (patch.File.EndsWith(".7z") && File.Exists(downloadPath))
             {
                 try
@@ -44,6 +43,11 @@ namespace Launcher.Utils
                 }
             }
 
+            if (onProgress != null)
+            {
+                _downloader.DownloadProgressChanged += (sender, e) => onProgress(e);
+            }
+
             await _downloader.DownloadFileTaskAsync(
                 $"https://patch.classiccounter.cc/{patch.File}",
                 $"{Directory.GetCurrentDirectory()}/{patch.File}"
@@ -53,10 +57,44 @@ namespace Launcher.Utils
             {
                 if (Debug.Enabled())
                     Terminal.Debug($"Download complete, starting extraction of: {patch.File}");
+                onExtract?.Invoke(); // for "extracting" status
                 string extractPath = $"{Directory.GetCurrentDirectory()}/{originalFileName}";
                 await Extract7z(downloadPath, extractPath);
             }
         }
+
+        // FOR DOWNLOAD STATUS
+        public static int dotCount = 0;
+        public static DateTime lastDotUpdate = DateTime.Now;
+        public static string GetDots()
+        {
+            if ((DateTime.Now - lastDotUpdate).TotalMilliseconds > 500)
+            {
+                dotCount = (dotCount + 1) % 4;
+                lastDotUpdate = DateTime.Now;
+            }
+            return "...".Substring(0, dotCount);
+        }
+        public static string GetProgressBar(double percentage)
+        {
+            int blocks = 12;
+            int level = (int)(percentage / (100.0 / (blocks * 3)));
+            string bar = "";
+
+            for (int i = 0; i < blocks; i++)
+            {
+                int blockLevel = Math.Min(3, Math.Max(0, level - (i * 3)));
+                bar += blockLevel switch
+                {
+                    0 => "░",
+                    1 => "▒",
+                    2 => "▓",
+                    3 => "█"
+                };
+            }
+            return bar;
+        }
+        // DOWNLOAD STATUS OVER
 
         private static async Task Extract7z(string archivePath, string outputPath)
         {

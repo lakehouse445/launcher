@@ -102,10 +102,10 @@ if (!Argument.Exists("--skip-validating"))
         }
 
         if (patches.Missing.Count > 0)
-            Terminal.Warning($"Found {patches.Missing.Count} missing {(patches.Missing.Count == 1 ? "patch" : "patches")}.");
+            Terminal.Warning($"Found {patches.Missing.Count} missing {(patches.Missing.Count == 1 ? "patch" : "patches")}!");
 
         if (patches.Outdated.Count > 0)
-            Terminal.Warning($"Found {patches.Outdated.Count} outdated {(patches.Outdated.Count == 1 ? "patch" : "patches")}.");
+            Terminal.Warning($"Found {patches.Outdated.Count} outdated {(patches.Outdated.Count == 1 ? "patch" : "patches")}!");
 
         Terminal.Print("If you're stuck at downloading patches - reopen the launcher.");
 
@@ -117,11 +117,14 @@ if (!Argument.Exists("--skip-validating"))
 
             foreach (Patch patch in patches.Missing)
             {
-                ctx.Status = $"Downloading missing patches. | {downloaded} / {patchCount}";
-
                 try
                 {
-                    await DownloadManager.DownloadPatch(patch);
+                    await DownloadManager.DownloadPatch(patch, (progress) => {
+                        var speed = progress.BytesPerSecondSpeed / (1024.0 * 1024.0);
+                        var status = patch.File.EndsWith(".7z") && progress.ProgressPercentage >= 100 ? "Extracting" : "Downloading";
+                        ctx.Status = $"{status} new patches{DownloadManager.GetDots().PadRight(3)} [gray]|[/] {downloaded}/{patchCount} [gray]|[/] {DownloadManager.GetProgressBar(progress.ProgressPercentage)} {progress.ProgressPercentage:F1}% [gray]|[/] {speed:F1} MB/s";
+                    });
+
                     downloaded++;
                 }
                 catch
@@ -147,14 +150,17 @@ if (!Argument.Exists("--skip-validating"))
 
             foreach (Patch patch in patches.Outdated)
             {
-                ctx.Status = $"Downloading new patches. | {downloaded} / {patchCount}";
-
-                try
+                try 
                 {
-                    await DownloadManager.DownloadPatch(patch);
+                    await DownloadManager.DownloadPatch(patch, (progress) => {
+                        var speed = progress.BytesPerSecondSpeed / (1024.0 * 1024.0);
+                        var status = patch.File.EndsWith(".7z") && progress.ProgressPercentage >= 100 ? "Extracting" : "Downloading";
+                        ctx.Status = $"{status} new patches{DownloadManager.GetDots().PadRight(3)} [gray]|[/] {downloaded}/{patchCount} [gray]|[/] {DownloadManager.GetProgressBar(progress.ProgressPercentage)} {progress.ProgressPercentage:F1}% [gray]|[/] {speed:F1} MB/s";
+                    });
+
                     downloaded++;
-                }
-                catch
+                } 
+                catch 
                 {
                     patchCount--;
                     notDownloaded++;
