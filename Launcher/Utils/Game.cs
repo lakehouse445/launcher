@@ -24,13 +24,6 @@ namespace Launcher.Utils
             string directory = Directory.GetCurrentDirectory();
             Terminal.Print($"Directory: {directory}");
 
-            if (!File.Exists($"{directory}/csgo.exe"))
-            {
-                Terminal.Error("csgo.exe doesn't exist! Closing launcher in 10 seconds.");
-                await Task.Delay(10000);
-                Environment.Exit(1);
-            }
-
             string gameStatePath = $"{directory}/csgo/cfg/gamestate_integration_cc.cfg";
             
             if (!Argument.Exists("--disable-rpc"))

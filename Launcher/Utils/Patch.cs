@@ -27,13 +27,18 @@ namespace Launcher.Utils
             return fileName.EndsWith(".7z") ? fileName[..^3] : fileName;
         }
 
-        private static async Task<List<Patch>> GetPatches()
+        private static async Task<List<Patch>> GetPatches(bool validateAll = false)
         {
             List<Patch> patches = new List<Patch>();
 
             try
             {
-                string responseString = await Api.ClassicCounter.GetPatches();
+                string responseString;
+                if (validateAll)
+                    responseString = await Api.ClassicCounter.GetFullGame();
+                else
+                    responseString = await Api.ClassicCounter.GetPatches();
+
                 JObject responseJson = JObject.Parse(responseString);
 
                 if (responseJson["files"] != null)
@@ -42,7 +47,7 @@ namespace Launcher.Utils
             catch
             {
                 if (Debug.Enabled())
-                    Terminal.Debug("Couldn't get patches.");
+                    Terminal.Debug($"Couldn't get {(validateAll ? "full game" : "patch")} API data.");
             }
 
             return patches;
@@ -58,9 +63,9 @@ namespace Launcher.Utils
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
 
-        public static async Task<Patches> ValidatePatches()
+        public static async Task<Patches> ValidatePatches(bool validateAll = false)
         {
-            List<Patch> patches = await GetPatches();
+            List<Patch> patches = await GetPatches(validateAll);
 
             List<Patch> missing = new();
             List<Patch> outdated = new();
@@ -92,10 +97,15 @@ namespace Launcher.Utils
                         outdated.Add(dirPatch);
                         needPak01Update = true;
                     }
-                    else
+                    else if (!Argument.Exists("--validate-all"))
                     {
                         if (Debug.Enabled())
                             Terminal.Debug("csgo/pak01_dir.vpk is up to date - will skip pak01 files");
+                    }
+                    else
+                    {
+                        if (Debug.Enabled())
+                            Terminal.Debug("csgo/pak01_dir.vpk is up to date - checking all files anyway due to --validate-all");
                     }
                 }
                 else
@@ -126,39 +136,7 @@ namespace Launcher.Utils
 
                 string path = $"{Directory.GetCurrentDirectory()}/{originalFileName}";
 
-                if (isPak01File)
-                {
-                    if (!File.Exists(path))
-                    {
-                        if (Debug.Enabled())
-                            Terminal.Debug($"Missing: {originalFileName}");
-
-                        missing.Add(patch);
-                        continue;
-                    }
-
-                    if (needPak01Update)
-                    {
-                        if (Debug.Enabled())
-                            Terminal.Debug($"Checking hash for: {originalFileName} (pak01_dir.vpk was outdated)");
-
-                        string hash = await GetHash(path);
-                        if (hash != patch.Hash)
-                        {
-                            if (Debug.Enabled())
-                                Terminal.Debug($"Outdated: {originalFileName}");
-
-                            File.Delete(path);
-                            outdated.Add(patch);
-                        }
-                    }
-                    else
-                    {
-                        if (Debug.Enabled())
-                            Terminal.Debug($"Skipping hash check for: {originalFileName} (pak01_dir.vpk up to date)");
-                    }
-                }
-                else
+                if (isPak01File && !needPak01Update && !Argument.Exists("--validate-all"))
                 {
                     if (!File.Exists(path))
                     {
@@ -170,17 +148,31 @@ namespace Launcher.Utils
                     }
 
                     if (Debug.Enabled())
-                        Terminal.Debug($"Checking hash for: {originalFileName}");
+                        Terminal.Debug($"Skipping hash check for: {originalFileName} (pak01_dir.vpk up to date)");
 
-                    string hash = await GetHash(path);
-                    if (hash != patch.Hash)
-                    {
-                        if (Debug.Enabled())
-                            Terminal.Debug($"Outdated: {originalFileName}");
+                    continue;
+                }
 
-                        File.Delete(path);
-                        outdated.Add(patch);
-                    }
+                if (!File.Exists(path))
+                {
+                    if (Debug.Enabled())
+                        Terminal.Debug($"Missing: {originalFileName}");
+
+                    missing.Add(patch);
+                    continue;
+                }
+
+                if (Debug.Enabled())
+                    Terminal.Debug($"Checking hash for: {originalFileName}{(isPak01File && Argument.Exists("--validate-all") ? " (--validate-all)" : "")}");
+
+                string hash = await GetHash(path);
+                if (hash != patch.Hash)
+                {
+                    if (Debug.Enabled())
+                        Terminal.Debug($"Outdated: {originalFileName}");
+
+                    File.Delete(path);
+                    outdated.Add(patch);
                 }
             }
 

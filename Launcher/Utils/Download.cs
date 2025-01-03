@@ -1,5 +1,6 @@
 ﻿using Downloader;
 using SevenZipExtractor;
+using Spectre.Console;
 
 namespace Launcher.Utils
 {
@@ -7,7 +8,7 @@ namespace Launcher.Utils
     {
         private static DownloadConfiguration _settings = new()
         {
-            ChunkCount = 4,
+            ChunkCount = 8,
             ParallelDownload = true
         };
         private static DownloadService _downloader = new DownloadService(_settings);
@@ -20,7 +21,7 @@ namespace Launcher.Utils
             );
         }
 
-        public static async Task DownloadPatch(Patch patch, Action<DownloadProgressChangedEventArgs>? onProgress = null, Action? onExtract = null)
+        public static async Task DownloadPatch(Patch patch, bool validateAll = false, Action<DownloadProgressChangedEventArgs>? onProgress = null, Action? onExtract = null)
         {
             string originalFileName = patch.File.EndsWith(".7z") ? patch.File[..^3] : patch.File;
             string downloadPath = $"{Directory.GetCurrentDirectory()}/{patch.File}";
@@ -48,8 +49,10 @@ namespace Launcher.Utils
                 _downloader.DownloadProgressChanged += (sender, e) => onProgress(e);
             }
 
+            string baseUrl = validateAll ? "https://misc.ollum.cc/ClassicCounter" : "https://patch.classiccounter.cc";
+
             await _downloader.DownloadFileTaskAsync(
-                $"https://patch.classiccounter.cc/{patch.File}",
+                $"{baseUrl}/{patch.File}",
                 $"{Directory.GetCurrentDirectory()}/{patch.File}"
             );
 
@@ -77,7 +80,7 @@ namespace Launcher.Utils
         }
         public static string GetProgressBar(double percentage)
         {
-            int blocks = 12;
+            int blocks = 16;
             int level = (int)(percentage / (100.0 / (blocks * 3)));
             string bar = "";
 
@@ -89,12 +92,90 @@ namespace Launcher.Utils
                     0 => "░",
                     1 => "▒",
                     2 => "▓",
-                    3 => "█"
+                    3 => "█",
+                    _ => "█"
                 };
             }
             return bar;
         }
         // DOWNLOAD STATUS OVER
+
+
+
+        // moved !--skip-validating stuff into this little helper function
+        public static async Task HandlePatches(Patches patches, StatusContext ctx, bool isGameFiles, int startingProgress = 0)
+        {
+            string fileType = isGameFiles ? "game file" : "patch";
+            string fileTypePlural = isGameFiles ? "game files" : "patches";
+
+            var allFiles = patches.Missing.Concat(patches.Outdated).ToList();
+            int totalFiles = allFiles.Count;
+            int completedFiles = startingProgress;
+            int failedFiles = 0;
+
+            // status update
+            Action<DownloadProgressChangedEventArgs, string> updateStatus = (progress, filename) =>
+            {
+                var speed = progress.BytesPerSecondSpeed / (1024.0 * 1024.0);
+                var progressText = $"{((float)completedFiles / totalFiles * 100):F1}% ({completedFiles}/{totalFiles})";
+                var status = filename.EndsWith(".7z") && progress.ProgressPercentage >= 100 ? "Extracting" : "Downloading new";
+                ctx.Status = $"{status} {fileTypePlural}{GetDots().PadRight(3)} [gray]|[/] {progressText} [gray]|[/] {GetProgressBar(progress.ProgressPercentage)} {progress.ProgressPercentage:F1}% [gray]|[/] {speed:F1} MB/s";
+            };
+
+            foreach (var patch in allFiles)
+            {
+                try
+                {
+                    await DownloadPatch(patch, isGameFiles, (progress) => updateStatus(progress, patch.File));
+                    completedFiles++;
+                }
+                catch
+                {
+                    failedFiles++;
+                    Terminal.Warning($"Couldn't process {fileType}: {patch.File}, possibly due to missing permissions.");
+                }
+            }
+
+            if (failedFiles > 0)
+                Terminal.Warning($"Couldn't download {failedFiles} {(failedFiles == 1 ? fileType : fileTypePlural)}!");
+        }
+
+        // handle files in parallel
+        /*private static int GetBatchSize(bool isGameFiles, List<Patch> files)
+        {
+            if (!isGameFiles) return 1;  // default for patches
+
+            // for game file dl, check first few files to determine batch size
+            try
+            {
+                var sampleFiles = files.Take(5);
+                long avgSize = 0;
+                int count = 0;
+                foreach (var file in sampleFiles)
+                {
+                    string filePath = $"{Directory.GetCurrentDirectory()}/{file.File}";
+                    if (File.Exists(filePath))
+                    {
+                        avgSize += new FileInfo(filePath).Length;
+                        count++;
+                    }
+                }
+                if (count > 0)
+                {
+                    avgSize /= count;
+                    if (avgSize < 10240) return 50;       // < 10KB
+                    if (avgSize < 102400) return 25;      // < 100KB
+                    if (avgSize < 1048576) return 10;     // < 1MB
+                    return 2;                             // larger files
+                }
+            }
+            catch
+            {
+                // if anything goes wrong, use default
+                return 1;
+            }
+            return 2;  // default for game files
+        }*/
 
         private static async Task Extract7z(string archivePath, string outputPath)
         {
@@ -202,6 +283,35 @@ namespace Launcher.Utils
             {
                 Terminal.Error($"Extraction failed: {ex.Message}\nStack trace: {ex.StackTrace}");
                 throw;
+            }
+        }
+
+        public static void Cleanup7zFiles()
+        {
+            try
+            {
+                string directory = Directory.GetCurrentDirectory();
+                var files = Directory.GetFiles(directory, "*.7z", SearchOption.AllDirectories);
+
+                foreach (string file in files)
+                {
+                    try
+                    {
+                        File.Delete(file);
+                        if (Debug.Enabled())
+                            Terminal.Debug($"Deleted .7z file: {file}");
+                    }
+                    catch (Exception ex)
+                    {
+                        if (Debug.Enabled())
+                            Terminal.Debug($"Failed to delete .7z file {file}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (Debug.Enabled())
+                    Terminal.Debug($"Failed to perform .7z cleanup: {ex.Message}");
             }
         }
     }

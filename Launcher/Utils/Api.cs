@@ -14,6 +14,10 @@ namespace Launcher.Utils
         [Headers("User-Agent: ClassicCounter Launcher")]
         [Get("/patch/get")]
         Task<string> GetPatches();
+
+        [Headers("User-Agent: ClassicCounter Launcher")]
+        [Get("/game/get")]
+        Task<string> GetFullGame();
     }
 
     public static class Api

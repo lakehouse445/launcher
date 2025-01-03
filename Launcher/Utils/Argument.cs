@@ -7,6 +7,7 @@
             "--debug-mode",
             "--skip-updates",
             "--skip-validating",
+            "--validate-all",
             "--patch-only"
         };
 

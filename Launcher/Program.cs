@@ -7,12 +7,20 @@ using Version = Launcher.Utils.Version;
 
 Console.Clear();
 
+if (Debug.Enabled())
+    Terminal.Debug("Cleaning up any .7z files at startup...");
+DownloadManager.Cleanup7zFiles();
+
 if (!Argument.Exists("--disable-rpc"))
     Discord.Init();
 
 Terminal.Init();
 
 await Task.Delay(1000);
+
+// this int saves total download progress (duh)
+// its used for whenever HandlePatches is called so that the display for downloading files doesnt glitch the fuck out
+int totalDownloadProgress = 0;
 
 string updaterPath = $"{Directory.GetCurrentDirectory()}/updater.exe";
 if (File.Exists(updaterPath))
@@ -73,14 +81,102 @@ if (!Argument.Exists("--skip-updates"))
         Terminal.Success("Launcher is up-to-date!");
 }
 
+string directory = Directory.GetCurrentDirectory();
+if (!File.Exists($"{directory}/csgo.exe"))
+{
+    Terminal.Warning("[[!]] csgo.exe not found in the current directory!");
+    Terminal.Warning($"Game files will be installed to: [grey82]{directory}[/]");
+    Terminal.Warning("This will download approximately 15GB of data. [red]Make sure you have enough disk space.[/]");
+    Terminal.Print("Would you like to download the full game? (y/n): ");
+
+    var response = Console.ReadKey(true);
+    Console.WriteLine(response.KeyChar); // echo key press
+
+    if (char.ToLower(response.KeyChar) == 'y')
+    {
+        await AnsiConsole
+        .Status()
+        .SpinnerStyle(Style.Parse("gray"))
+        .StartAsync("Downloading full game...", async ctx =>
+        {
+            Patches gameFiles = await PatchManager.ValidatePatches(true);
+            if (gameFiles.Success)
+            {
+                if (gameFiles.Missing.Count > 0 || gameFiles.Outdated.Count > 0)
+                {
+                    await DownloadManager.HandlePatches(gameFiles, ctx, true, totalDownloadProgress);
+                    totalDownloadProgress += gameFiles.Missing.Count + gameFiles.Outdated.Count;
+
+                    Terminal.Success("Game files downloaded successfully!");
+                }
+            }
+            else
+            {
+                Terminal.Error("[!] Couldn't download game files!");
+                Terminal.Error("[!] Is your ISP blocking CloudFlare? Check your DNS settings.");
+                Terminal.Error("Closing launcher in 10 seconds...");
+                await Task.Delay(10000);
+                Environment.Exit(1);
+            }
+        });
+    }
+    else
+    {
+        Terminal.Error("Game files are required to run ClassicCounter. Closing launcher in 10 seconds...");
+        await Task.Delay(10000);
+        Environment.Exit(1);
+    }
+}
+
 if (!Argument.Exists("--skip-validating"))
 {
     await AnsiConsole
     .Status()
     .SpinnerStyle(Style.Parse("gray"))
-    .StartAsync("Validating patches...", async ctx =>
+    .StartAsync("Validating files...", async ctx =>
     {
-        Patches patches = await PatchManager.ValidatePatches();
+        bool validateAll = Argument.Exists("--validate-all");
+
+        if (validateAll)
+        {
+            // First validate all game files
+            ctx.Status = "Validating game files...";
+            Patches gameFiles = await PatchManager.ValidatePatches(true);
+            if (gameFiles.Success)
+            {
+                Terminal.Print("Finished validating game files!");
+                if (gameFiles.Missing.Count > 0 || gameFiles.Outdated.Count > 0)
+                {
+                    if (gameFiles.Missing.Count > 0)
+                        Terminal.Warning($"Found {gameFiles.Missing.Count} missing {(gameFiles.Missing.Count == 1 ? "game file" : "game files")}!");
+
+                    if (gameFiles.Outdated.Count > 0)
+                        Terminal.Warning($"Found {gameFiles.Outdated.Count} outdated {(gameFiles.Outdated.Count == 1 ? "game file" : "game files")}!");
+
+                    Terminal.Print("If you're stuck at downloading - reopen the launcher.");
+
+                    await DownloadManager.HandlePatches(gameFiles, ctx, true, totalDownloadProgress);
+                    totalDownloadProgress += gameFiles.Missing.Count + gameFiles.Outdated.Count;
+                }
+                else
+                {
+                    Terminal.Success("Game files are up-to-date!");
+                }
+            }
+            else
+            {
+                Terminal.Error("[!] Couldn't validate game files!");
+                Terminal.Error("[!] Is your ISP blocking CloudFlare? Check your DNS settings.");
+                return;
+            }
+
+            // Then validate patches
+            ctx.Status = "Validating patches...";
+            Terminal.Print("\nNow checking for patch updates...");
+        }
+
+        // Regular patch validation
+        Patches patches = await PatchManager.ValidatePatches(false);
         if (patches.Success)
         {
             Terminal.Print("Finished validating patches!");
@@ -109,71 +205,8 @@ if (!Argument.Exists("--skip-validating"))
 
         Terminal.Print("If you're stuck at downloading patches - reopen the launcher.");
 
-        if (patches.Missing.Count > 0)
-        {
-            int patchCount = patches.Missing.Count;
-            int downloaded = 0;
-            int notDownloaded = 0;
-
-            foreach (Patch patch in patches.Missing)
-            {
-                try
-                {
-                    await DownloadManager.DownloadPatch(patch, (progress) => {
-                        var speed = progress.BytesPerSecondSpeed / (1024.0 * 1024.0);
-                        var status = patch.File.EndsWith(".7z") && progress.ProgressPercentage >= 100 ? "Extracting" : "Downloading";
-                        ctx.Status = $"{status} new patches{DownloadManager.GetDots().PadRight(3)} [gray]|[/] {downloaded}/{patchCount} [gray]|[/] {DownloadManager.GetProgressBar(progress.ProgressPercentage)} {progress.ProgressPercentage:F1}% [gray]|[/] {speed:F1} MB/s";
-                    });
-
-                    downloaded++;
-                }
-                catch
-                {
-                    patchCount--;
-                    notDownloaded++;
-
-                    Terminal.Warning($"Couldn't download missing patch: {patch.File}, possibly due to missing permissions.");
-                }
-
-                await Task.Delay(250);
-            }
-
-            if (notDownloaded > 0)
-                Terminal.Warning($"Couldn't download {notDownloaded} missing patches!");
-        }
-
-        if (patches.Outdated.Count > 0)
-        {
-            int patchCount = patches.Outdated.Count;
-            int downloaded = 0;
-            int notDownloaded = 0;
-
-            foreach (Patch patch in patches.Outdated)
-            {
-                try 
-                {
-                    await DownloadManager.DownloadPatch(patch, (progress) => {
-                        var speed = progress.BytesPerSecondSpeed / (1024.0 * 1024.0);
-                        var status = patch.File.EndsWith(".7z") && progress.ProgressPercentage >= 100 ? "Extracting" : "Downloading";
-                        ctx.Status = $"{status} new patches{DownloadManager.GetDots().PadRight(3)} [gray]|[/] {downloaded}/{patchCount} [gray]|[/] {DownloadManager.GetProgressBar(progress.ProgressPercentage)} {progress.ProgressPercentage:F1}% [gray]|[/] {speed:F1} MB/s";
-                    });
-
-                    downloaded++;
-                } 
-                catch 
-                {
-                    patchCount--;
-                    notDownloaded++;
-
-                    Terminal.Warning($"Couldn't download new patch: {patch.File}, possibly due to missing permissions.");
-                }
-
-                await Task.Delay(250);
-            }
-
-            if (notDownloaded > 0)
-                Terminal.Warning($"Couldn't download {notDownloaded} new patches!");
-        }
+        await DownloadManager.HandlePatches(patches, ctx, false, totalDownloadProgress);
+        totalDownloadProgress += patches.Missing.Count + patches.Outdated.Count;
 
         // Cleanup temporary files
         if (Debug.Enabled())
@@ -213,6 +246,10 @@ if (Argument.Exists("--patch-only"))
     Environment.Exit(0);
     return;
 }
+
+if (Debug.Enabled())
+    Terminal.Debug("Cleaning up any .7z files...");
+DownloadManager.Cleanup7zFiles();
 
 bool launched = await Game.Launch();
 if (!launched)
