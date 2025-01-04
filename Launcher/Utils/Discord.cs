@@ -14,8 +14,15 @@ namespace Launcher.Utils
         {
             _client.OnReady += OnReady;
 
-            _client.Logger = new ConsoleLogger() { Level = LogLevel.Warning };
-            _client.Initialize();
+            _client.Logger = new ConsoleLogger()
+            {
+                Level = Debug.Enabled() ? LogLevel.Warning : LogLevel.None
+            };
+
+            if (!_client.Initialize())
+            {
+                return;
+            }
 
             SetDetails("In Launcher");
             SetTimestamp(DateTime.UtcNow);
