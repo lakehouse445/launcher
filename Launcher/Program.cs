@@ -112,8 +112,8 @@ if (!File.Exists($"{directory}/csgo.exe"))
             }
             else
             {
-                Terminal.Error("[!] Couldn't download game files!");
-                Terminal.Error("[!] Is your ISP blocking CloudFlare? Check your DNS settings.");
+                Terminal.Error("[[!]] Couldn't download game files!");
+                Terminal.Error("[[!]] Is your ISP blocking CloudFlare? Check your DNS settings.");
                 Terminal.Error("Closing launcher in 10 seconds...");
                 await Task.Delay(10000);
                 Environment.Exit(1);
@@ -165,8 +165,8 @@ if (!Argument.Exists("--skip-validating"))
             }
             else
             {
-                Terminal.Error("[!] Couldn't validate game files!");
-                Terminal.Error("[!] Is your ISP blocking CloudFlare? Check your DNS settings.");
+                Terminal.Error("[[!]] Couldn't validate game files!");
+                Terminal.Error("[[!]] Is your ISP blocking CloudFlare? Check your DNS settings.");
                 return;
             }
 
@@ -188,8 +188,8 @@ if (!Argument.Exists("--skip-validating"))
         }
         else
         {
-            Terminal.Error("[!] Couldn't validate patches!");
-            Terminal.Error("[!] Is your ISP blocking CloudFlare? Check your DNS settings.");
+            Terminal.Error("[[!]] Couldn't validate patches!");
+            Terminal.Error("[[!]] Is your ISP blocking CloudFlare? Check your DNS settings.");
             if (!Argument.Exists("--patch-only"))
             {
                 Terminal.Warning("Launching ClassicCounter anyways...");
