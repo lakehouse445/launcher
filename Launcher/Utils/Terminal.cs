@@ -16,20 +16,20 @@ namespace Launcher.Utils
             AnsiConsole.MarkupLine($"{_prefix} {_seperator} [{_grey}]Version: {Version.Current}[/]");
         }
 
-        public static void Print(object? message)
-            => AnsiConsole.MarkupLine($"{_prefix} {_seperator} [{_grey}]{message}[/]");
+    public static void Print(object? message)
+        => AnsiConsole.MarkupLine($"{_prefix} {_seperator} [{_grey}]{Markup.Escape(message?.ToString() ?? string.Empty)}[/]");
 
-        public static void Success(object? message)
-            => AnsiConsole.MarkupLine($"{_prefix} {_seperator} [green1]{message}[/]");
+    public static void Success(object? message)
+        => AnsiConsole.MarkupLine($"{_prefix} {_seperator} [green1]{Markup.Escape(message?.ToString() ?? string.Empty)}[/]");
 
-        public static void Warning(object? message)
-            => AnsiConsole.MarkupLine($"{_prefix} {_seperator} [yellow]{message}[/]");
+    public static void Warning(object? message)
+        => AnsiConsole.MarkupLine($"{_prefix} {_seperator} [yellow]{Markup.Escape(message?.ToString() ?? string.Empty)}[/]");
 
-        public static void Error(object? message)
-            => AnsiConsole.MarkupLine($"{_prefix} {_seperator} [red]{message}[/]");
+    public static void Error(object? message)
+        => AnsiConsole.MarkupLine($"{_prefix} {_seperator} [red]{Markup.Escape(message?.ToString() ?? string.Empty)}[/]");
 
-        public static void Debug(object? message)
-            => AnsiConsole.MarkupLine($"[purple]{message}[/]");
+    public static void Debug(object? message)
+        => AnsiConsole.MarkupLine($"[purple]{Markup.Escape(message?.ToString() ?? string.Empty)}[/]");
 
         private static string Date()
             => $"[{_grey}]{DateTime.Now.ToString("HH:mm:ss")}[/]";
