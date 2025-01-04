@@ -84,7 +84,7 @@ if (!Argument.Exists("--skip-updates"))
 string directory = Directory.GetCurrentDirectory();
 if (!File.Exists($"{directory}/csgo.exe"))
 {
-    Terminal.Warning("[[!]] csgo.exe not found in the current directory!");
+    Terminal.Warning("(!)  csgo.exe not found in the current directory!");
     Terminal.Warning($"Game files will be installed to: [grey82]{directory}[/]");
     Terminal.Warning("This will download approximately 15GB of data. [red]Make sure you have enough disk space.[/]");
     Terminal.Print("Would you like to download the full game? (y/n): ");
@@ -112,8 +112,8 @@ if (!File.Exists($"{directory}/csgo.exe"))
             }
             else
             {
-                Terminal.Error("[[!]] Couldn't download game files!");
-                Terminal.Error("[[!]] Is your ISP blocking CloudFlare? Check your DNS settings.");
+                Terminal.Error("(!)  Couldn't download game files!");
+                Terminal.Error("(!)  Is your ISP blocking CloudFlare? Check your DNS settings.");
                 Terminal.Error("Closing launcher in 10 seconds...");
                 await Task.Delay(10000);
                 Environment.Exit(1);
@@ -165,8 +165,8 @@ if (!Argument.Exists("--skip-validating"))
             }
             else
             {
-                Terminal.Error("[[!]] Couldn't validate game files!");
-                Terminal.Error("[[!]] Is your ISP blocking CloudFlare? Check your DNS settings.");
+                Terminal.Error("(!)  Couldn't validate game files!");
+                Terminal.Error("(!)  Is your ISP blocking CloudFlare? Check your DNS settings.");
                 return;
             }
 
@@ -188,8 +188,8 @@ if (!Argument.Exists("--skip-validating"))
         }
         else
         {
-            Terminal.Error("[[!]] Couldn't validate patches!");
-            Terminal.Error("[[!]] Is your ISP blocking CloudFlare? Check your DNS settings.");
+            Terminal.Error("(!)  Couldn't validate patches!");
+            Terminal.Error("(!)  Is your ISP blocking CloudFlare? Check your DNS settings.");
             if (!Argument.Exists("--patch-only"))
             {
                 Terminal.Warning("Launching ClassicCounter anyways...");
