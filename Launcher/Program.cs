@@ -95,6 +95,20 @@ if (!File.Exists($"{directory}/csgo.exe"))
 
     if (char.ToLower(response.KeyChar) == 'y')
     {
+        // Check available disk space
+        DriveInfo driveInfo = new DriveInfo(Path.GetPathRoot(directory));
+        long requiredSpace = 24L * 1024 * 1024 * 1024; // 24 GB in bytes
+
+        if (driveInfo.AvailableFreeSpace < requiredSpace)
+        {
+            Terminal.Error("(!) Not enough disk space available!");
+            Terminal.Error($"Required: 24 GB, Available: {driveInfo.AvailableFreeSpace / (1024.0 * 1024 * 1024):F2} GB");
+            Terminal.Error("Please free up some disk space and try again. Closing launcher in 10 seconds...");
+            await Task.Delay(10000);
+            Environment.Exit(1);
+            return;
+        }
+
         await AnsiConsole
         .Status()
         .SpinnerStyle(Style.Parse("gray"))
