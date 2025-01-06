@@ -33,7 +33,6 @@
 - [Downloader](https://github.com/bezzad/Downloader) by [bezzad](https://github.com/bezzad)
 - [Refit](https://github.com/reactiveui/refit) by [ReactiveUI](https://github.com/reactiveui)
 - [Spectre.Console](https://github.com/spectreconsole/spectre.console) by [Spectre Console](https://github.com/spectreconsole)
-- [SevenZipExtractor](https://github.com/adoconnection/SevenZipExtractor) by [adoconnection](https://github.com/adoconnection)
 
 [downloads-shield]: https://img.shields.io/github/downloads/classiccounter/launcher/total.svg?style=for-the-badge
 [downloads-url]: https://github.com/classiccounter/launcher/releases/latest

@@ -35,7 +35,7 @@ namespace Launcher.Utils
             {
                 string responseString;
                 if (validateAll)
-                    responseString = await Api.ClassicCounter.GetFullGame();
+                    responseString = await Api.ClassicCounter.GetFullGameValidate();
                 else
                     responseString = await Api.ClassicCounter.GetPatches();
 

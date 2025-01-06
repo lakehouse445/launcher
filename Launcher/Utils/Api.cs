@@ -2,6 +2,18 @@
 
 namespace Launcher.Utils
 {
+    public class FullGameDownload
+    {
+        public required string File { get; set; }
+        public required string Link { get; set; }
+        public required string Hash { get; set; }
+    }
+
+    public class FullGameDownloadResponse
+    {
+        public required List<FullGameDownload> Files { get; set; }
+    }
+
     public interface IGitHub
     {
         [Headers("User-Agent: ClassicCounter Launcher")]
@@ -17,7 +29,11 @@ namespace Launcher.Utils
 
         [Headers("User-Agent: ClassicCounter Launcher")]
         [Get("/game/get")]
-        Task<string> GetFullGame();
+        Task<string> GetFullGameValidate();
+
+        [Headers("User-Agent: ClassicCounter Launcher")]
+        [Get("/game/full")]
+        Task<FullGameDownloadResponse> GetFullGameDownload();
     }
 
     public static class Api

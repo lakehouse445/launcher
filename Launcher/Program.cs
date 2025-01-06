@@ -84,13 +84,14 @@ if (!Argument.Exists("--skip-updates"))
 string directory = Directory.GetCurrentDirectory();
 if (!File.Exists($"{directory}/csgo.exe"))
 {
-    Terminal.Warning("(!)  csgo.exe not found in the current directory!");
-    Terminal.Warning($"Game files will be installed to: [grey82]{directory}[/]");
-    Terminal.Warning("This will download approximately 15GB of data. [red]Make sure you have enough disk space.[/]");
-    Terminal.Print("Would you like to download the full game? (y/n): ");
+    Terminal.Error("(!) csgo.exe not found in the current directory!");
+    Terminal.Warning($"Game files will be installed to: {directory}");
+    Terminal.Warning("This will download approximately 15GB of data. Make sure you have enough disk space.");
+    AnsiConsole.Markup($"[orange1]Classic[/][blue]Counter[/] [grey50]|[/] [grey82]Would you like to download the full game? (y/n): [/]");
 
     var response = Console.ReadKey(true);
-    Console.WriteLine(response.KeyChar); // echo key press
+    Console.WriteLine(response.KeyChar);
+    Console.WriteLine();
 
     if (char.ToLower(response.KeyChar) == 'y')
     {
@@ -99,25 +100,7 @@ if (!File.Exists($"{directory}/csgo.exe"))
         .SpinnerStyle(Style.Parse("gray"))
         .StartAsync("Downloading full game...", async ctx =>
         {
-            Patches gameFiles = await PatchManager.ValidatePatches(true);
-            if (gameFiles.Success)
-            {
-                if (gameFiles.Missing.Count > 0 || gameFiles.Outdated.Count > 0)
-                {
-                    await DownloadManager.HandlePatches(gameFiles, ctx, true, totalDownloadProgress);
-                    totalDownloadProgress += gameFiles.Missing.Count + gameFiles.Outdated.Count;
-
-                    Terminal.Success("Game files downloaded successfully!");
-                }
-            }
-            else
-            {
-                Terminal.Error("(!)  Couldn't download game files!");
-                Terminal.Error("(!)  Is your ISP blocking CloudFlare? Check your DNS settings.");
-                Terminal.Error("Closing launcher in 10 seconds...");
-                await Task.Delay(10000);
-                Environment.Exit(1);
-            }
+            await DownloadManager.DownloadFullGame(ctx);
         });
     }
     else
@@ -165,14 +148,14 @@ if (!Argument.Exists("--skip-validating"))
             }
             else
             {
-                Terminal.Error("(!)  Couldn't validate game files!");
-                Terminal.Error("(!)  Is your ISP blocking CloudFlare? Check your DNS settings.");
+                Terminal.Error("(!) Couldn't validate game files!");
+                Terminal.Error("(!) Is your ISP blocking CloudFlare? Check your DNS settings.");
                 return;
             }
 
             // Then validate patches
             ctx.Status = "Validating patches...";
-            Terminal.Print("\nNow checking for patch updates...");
+            Terminal.Print("\nNow checking for new patches...");
         }
 
         // Regular patch validation
@@ -188,8 +171,8 @@ if (!Argument.Exists("--skip-validating"))
         }
         else
         {
-            Terminal.Error("(!)  Couldn't validate patches!");
-            Terminal.Error("(!)  Is your ISP blocking CloudFlare? Check your DNS settings.");
+            Terminal.Error("(!) Couldn't validate patches!");
+            Terminal.Error("(!) Is your ISP blocking CloudFlare? Check your DNS settings.");
             if (!Argument.Exists("--patch-only"))
             {
                 Terminal.Warning("Launching ClassicCounter anyways...");

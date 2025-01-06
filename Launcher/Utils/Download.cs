@@ -1,6 +1,7 @@
 ﻿using Downloader;
-using SevenZipExtractor;
+using Refit;
 using Spectre.Console;
+using System.Diagnostics;
 
 namespace Launcher.Utils
 {
@@ -21,7 +22,11 @@ namespace Launcher.Utils
             );
         }
 
-        public static async Task DownloadPatch(Patch patch, bool validateAll = false, Action<DownloadProgressChangedEventArgs>? onProgress = null, Action? onExtract = null)
+        public static async Task DownloadPatch(
+            Patch patch,
+            bool validateAll = false,
+            Action<Downloader.DownloadProgressChangedEventArgs>? onProgress = null,
+            Action? onExtract = null)
         {
             string originalFileName = patch.File.EndsWith(".7z") ? patch.File[..^3] : patch.File;
             string downloadPath = $"{Directory.GetCurrentDirectory()}/{patch.File}";
@@ -44,17 +49,31 @@ namespace Launcher.Utils
                 }
             }
 
+            string baseUrl = validateAll ? "https://game.classiccounter.cc" : "https://patch.classiccounter.cc";
+
             if (onProgress != null)
             {
-                _downloader.DownloadProgressChanged += (sender, e) => onProgress(e);
+                EventHandler<Downloader.DownloadProgressChangedEventArgs> progressHandler = (sender, e) => onProgress(e);
+                _downloader.DownloadProgressChanged += progressHandler;
+                try
+                {
+                    await _downloader.DownloadFileTaskAsync(
+                        $"{baseUrl}/{patch.File}",
+                        $"{Directory.GetCurrentDirectory()}/{patch.File}"
+                    );
+                }
+                finally
+                {
+                    _downloader.DownloadProgressChanged -= progressHandler;
+                }
             }
-
-            string baseUrl = validateAll ? "https://misc.ollum.cc/ClassicCounter" : "https://patch.classiccounter.cc";
-
-            await _downloader.DownloadFileTaskAsync(
-                $"{baseUrl}/{patch.File}",
-                $"{Directory.GetCurrentDirectory()}/{patch.File}"
-            );
+            else
+            {
+                await _downloader.DownloadFileTaskAsync(
+                    $"{baseUrl}/{patch.File}",
+                    $"{Directory.GetCurrentDirectory()}/{patch.File}"
+                );
+            }
 
             if (patch.File.EndsWith(".7z"))
             {
@@ -63,6 +82,302 @@ namespace Launcher.Utils
                 onExtract?.Invoke(); // for "extracting" status
                 string extractPath = $"{Directory.GetCurrentDirectory()}/{originalFileName}";
                 await Extract7z(downloadPath, extractPath);
+            }
+        }
+
+        public static async Task HandlePatches(Patches patches, StatusContext ctx, bool isGameFiles, int startingProgress = 0)
+        {
+            string fileType = isGameFiles ? "game file" : "patch";
+            string fileTypePlural = isGameFiles ? "game files" : "patches";
+
+            var allFiles = patches.Missing.Concat(patches.Outdated).ToList();
+            int totalFiles = allFiles.Count;
+            int completedFiles = startingProgress;
+            int failedFiles = 0;
+
+            // status update
+            Action<Downloader.DownloadProgressChangedEventArgs, string> updateStatus = (progress, filename) =>
+            {
+                var speed = progress.BytesPerSecondSpeed / (1024.0 * 1024.0);
+                var progressText = $"{((float)completedFiles / totalFiles * 100):F1}% ({completedFiles}/{totalFiles})";
+                var status = filename.EndsWith(".7z") && progress.ProgressPercentage >= 100 ? "Extracting" : "Downloading new";
+                ctx.Status = $"{status} {fileTypePlural}{GetDots().PadRight(3)} [gray]|[/] {progressText} [gray]|[/] {GetProgressBar(progress.ProgressPercentage)} {progress.ProgressPercentage:F1}% [gray]|[/] {speed:F1} MB/s";
+            };
+
+            foreach (var patch in allFiles)
+            {
+                try
+                {
+                    await DownloadPatch(patch, isGameFiles, progress => updateStatus(progress, patch.File));
+                    completedFiles++;
+                }
+                catch
+                {
+                    failedFiles++;
+                    Terminal.Warning($"Couldn't process {fileType}: {patch.File}, possibly due to missing permissions.");
+                }
+            }
+
+            if (failedFiles > 0)
+                Terminal.Warning($"Couldn't download {failedFiles} {(failedFiles == 1 ? fileType : fileTypePlural)}!");
+        }
+
+        public static async Task DownloadFullGame(StatusContext ctx)
+        {
+            try
+            {
+                var gameFiles = await Api.ClassicCounter.GetFullGameDownload();
+
+                if (gameFiles?.Files == null || gameFiles.Files.Count == 0)
+                {
+                    Terminal.Error("No files received from API. Closing launcher in 5 seconds...");
+                    await Task.Delay(5000);
+                    Environment.Exit(1);
+                    return;
+                }
+
+                int totalFiles = gameFiles.Files.Count;
+                int completedFiles = 0;
+                List<string> failedFiles = new List<string>();
+
+                foreach (var file in gameFiles.Files)
+                {
+                    string filePath = Path.Combine(Directory.GetCurrentDirectory(), file.File);
+                    bool needsDownload = true;
+
+                    if (File.Exists(filePath))
+                    {
+                        string fileHash = CalculateMD5(filePath);
+                        if (fileHash.Equals(file.Hash, StringComparison.OrdinalIgnoreCase))
+                        {
+                            needsDownload = false;
+                            completedFiles++;
+                            continue;
+                        }
+                    }
+
+                    if (needsDownload)
+                    {
+                        try
+                        {
+                            EventHandler<Downloader.DownloadProgressChangedEventArgs> progressHandler = (sender, e) =>
+                            {
+                                var speed = e.BytesPerSecondSpeed / (1024.0 * 1024.0);
+                                var progressText = $"{((float)completedFiles / totalFiles * 100):F1}% ({completedFiles}/{totalFiles})";
+                                ctx.Status = $"Downloading {file.File}{GetDots().PadRight(3)} [gray]|[/] {progressText} [gray]|[/] {GetProgressBar(e.ProgressPercentage)} {e.ProgressPercentage:F1}% [gray]|[/] {speed:F1} MB/s";
+                            };
+                            _downloader.DownloadProgressChanged += progressHandler;
+
+                            try
+                            {
+                                await _downloader.DownloadFileTaskAsync(
+                                    file.Link,
+                                    filePath
+                                );
+
+                                string downloadedHash = CalculateMD5(filePath);
+                                if (!downloadedHash.Equals(file.Hash, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    failedFiles.Add(file.File);
+                                    Terminal.Error($"Hash mismatch for {file.File}");
+                                    continue;
+                                }
+
+                                completedFiles++;
+                            }
+                            finally
+                            {
+                                _downloader.DownloadProgressChanged -= progressHandler;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            failedFiles.Add(file.File);
+                            Terminal.Error($"Failed to download {file.File}: {ex.Message}");
+                        }
+                    }
+                }
+
+                if (failedFiles.Count == 0)
+                {
+                    ctx.Status = "Extracting game files...";
+                    await ExtractSplitArchive(gameFiles.Files.Select(f => f.File).ToList());
+                    Terminal.Success("Game files downloaded and extracted successfully!");
+                }
+                else
+                {
+                    Terminal.Error($"Failed to download {failedFiles.Count} files. Closing launcher in 5 seconds...");
+                    await Task.Delay(5000);
+                    Environment.Exit(1);
+                }
+            }
+            catch (ApiException ex)
+            {
+                Terminal.Error($"Failed to get game files from API: {ex.Message}");
+                Terminal.Error("Closing launcher in 5 seconds...");
+                await Task.Delay(5000);
+                Environment.Exit(1);
+            }
+            catch (Exception ex)
+            {
+                Terminal.Error($"An error occurred: {ex.Message}");
+                Terminal.Error("Closing launcher in 5 seconds...");
+                await Task.Delay(5000);
+                Environment.Exit(1);
+            }
+        }
+
+        private static string CalculateMD5(string filename)
+        {
+            using (var md5 = System.Security.Cryptography.MD5.Create())
+            using (var stream = File.OpenRead(filename))
+            {
+                byte[] hash = md5.ComputeHash(stream);
+                return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        // meant only for downloading whole game for now
+        // todo maybe make it more modular/allow other functions to use this
+        private static async Task ExtractSplitArchive(List<string> files)
+        {
+            if (files == null || files.Count == 0)
+            {
+                throw new ArgumentException("No files provided for extraction");
+            }
+
+            files.Sort();
+
+            if (Debug.Enabled())
+            {
+                Terminal.Debug($"Starting extraction of split archive:");
+                foreach (var file in files)
+                {
+                    Terminal.Debug($"Found part: {file}");
+                }
+            }
+
+            string firstFile = files[0];
+            string extractPath = Directory.GetCurrentDirectory();
+            string tempExtractPath = Path.Combine(extractPath, "temp_extract");
+
+            try
+            {
+                Directory.CreateDirectory(tempExtractPath);
+
+                await Download7za();
+
+                string? launcherDir = Path.GetDirectoryName(Environment.ProcessPath);
+                if (launcherDir == null)
+                {
+                    throw new InvalidOperationException("Could not determine launcher directory");
+                }
+
+                string exePath = Path.Combine(launcherDir, "7za.exe");
+
+                using (var process = new Process())
+                {
+                    process.StartInfo = new ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        Arguments = $"x \"{firstFile}\" -o\"{tempExtractPath}\" -y",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    };
+
+                    if (Debug.Enabled())
+                        Terminal.Debug($"Starting extraction to temp directory...");
+
+                    process.Start();
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode != 0)
+                    {
+                        throw new Exception($"7za extraction failed with exit code: {process.ExitCode}");
+                    }
+                }
+
+                string classicCounterPath = Path.Combine(tempExtractPath, "ClassicCounter");
+                if (Directory.Exists(classicCounterPath))
+                {
+                    if (Debug.Enabled())
+                        Terminal.Debug("Moving contents from ClassicCounter folder to root directory...");
+
+                    // first, get all files and directories from the ClassicCounter folder
+                    foreach (string dirPath in Directory.GetDirectories(classicCounterPath, "*", SearchOption.AllDirectories))
+                    {
+                        // create directory in root, removing the "ClassicCounter" part from the path
+                        string newDirPath = dirPath.Replace(classicCounterPath, extractPath);
+                        Directory.CreateDirectory(newDirPath);
+                    }
+
+                    foreach (string filePath in Directory.GetFiles(classicCounterPath, "*.*", SearchOption.AllDirectories))
+                    {
+                        string newFilePath = filePath.Replace(classicCounterPath, extractPath);
+
+                        // skip launcher.exe
+                        if (Path.GetFileName(filePath).Equals("launcher.exe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (Debug.Enabled())
+                                Terminal.Debug("Skipping launcher.exe");
+                            continue;
+                        }
+
+                        try
+                        {
+                            if (File.Exists(newFilePath))
+                            {
+                                File.Delete(newFilePath);
+                            }
+                            File.Move(filePath, newFilePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            Terminal.Warning($"Failed to move file {filePath}: {ex.Message}");
+                        }
+                    }
+                }
+                else
+                {
+                    throw new DirectoryNotFoundException("ClassicCounter folder not found in extracted contents");
+                }
+
+                try
+                {
+                    Directory.Delete(tempExtractPath, true);
+                    if (Debug.Enabled())
+                        Terminal.Debug("Deleted temporary extraction directory");
+
+                    foreach (string file in files)
+                    {
+                        File.Delete(file);
+                        if (Debug.Enabled())
+                            Terminal.Debug($"Deleted archive part: {file}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Terminal.Warning($"Failed to cleanup some temporary files: {ex.Message}");
+                }
+
+                if (Debug.Enabled())
+                    Terminal.Debug("Extraction and file movement completed successfully!");
+            }
+            catch (Exception ex)
+            {
+                Terminal.Error($"Extraction failed: {ex.Message}");
+                if (Debug.Enabled())
+                    Terminal.Debug($"Stack trace: {ex.StackTrace}");
+
+                try
+                {
+                    if (Directory.Exists(tempExtractPath))
+                        Directory.Delete(tempExtractPath, true);
+                }
+                catch { }
+
+                throw;
             }
         }
 
@@ -102,80 +417,72 @@ namespace Launcher.Utils
 
 
 
-        // moved !--skip-validating stuff into this little helper function
-        public static async Task HandlePatches(Patches patches, StatusContext ctx, bool isGameFiles, int startingProgress = 0)
+        private static async Task Download7za()
         {
-            string fileType = isGameFiles ? "game file" : "patch";
-            string fileTypePlural = isGameFiles ? "game files" : "patches";
-
-            var allFiles = patches.Missing.Concat(patches.Outdated).ToList();
-            int totalFiles = allFiles.Count;
-            int completedFiles = startingProgress;
-            int failedFiles = 0;
-
-            // status update
-            Action<DownloadProgressChangedEventArgs, string> updateStatus = (progress, filename) =>
+            string? launcherDir = Path.GetDirectoryName(Environment.ProcessPath);
+            if (launcherDir == null)
             {
-                var speed = progress.BytesPerSecondSpeed / (1024.0 * 1024.0);
-                var progressText = $"{((float)completedFiles / totalFiles * 100):F1}% ({completedFiles}/{totalFiles})";
-                var status = filename.EndsWith(".7z") && progress.ProgressPercentage >= 100 ? "Extracting" : "Downloading new";
-                ctx.Status = $"{status} {fileTypePlural}{GetDots().PadRight(3)} [gray]|[/] {progressText} [gray]|[/] {GetProgressBar(progress.ProgressPercentage)} {progress.ProgressPercentage:F1}% [gray]|[/] {speed:F1} MB/s";
+                throw new InvalidOperationException("Could not determine launcher directory");
+            }
+
+            string exePath = Path.Combine(launcherDir, "7za.exe");
+            bool downloaded = false;
+            int retryCount = 0;
+            string[] fallbackUrls = new[]
+            {
+                "https://fastdl.classiccounter.cc/7za.exe",
+                "https://ollumcc.github.io/7za.exe"
             };
 
-            foreach (var patch in allFiles)
+            while (!downloaded && retryCount < 10)
             {
-                try
+                if (!File.Exists(exePath))
                 {
-                    await DownloadPatch(patch, isGameFiles, (progress) => updateStatus(progress, patch.File));
-                    completedFiles++;
-                }
-                catch
-                {
-                    failedFiles++;
-                    Terminal.Warning($"Couldn't process {fileType}: {patch.File}, possibly due to missing permissions.");
-                }
-            }
+                    if (Debug.Enabled())
+                        Terminal.Debug($"7za.exe not found, downloading... (Attempt {retryCount + 1}/10)");
 
-            if (failedFiles > 0)
-                Terminal.Warning($"Couldn't download {failedFiles} {(failedFiles == 1 ? fileType : fileTypePlural)}!");
-        }
-
-        // handle files in parallel
-        /*private static int GetBatchSize(bool isGameFiles, List<Patch> files)
-        {
-            if (!isGameFiles) return 1;  // default for patches
-
-            // for game file dl, check first few files to determine batch size
-            try
-            {
-                var sampleFiles = files.Take(5);
-                long avgSize = 0;
-                int count = 0;
-                foreach (var file in sampleFiles)
-                {
-                    string filePath = $"{Directory.GetCurrentDirectory()}/{file.File}";
-                    if (File.Exists(filePath))
+                    try
                     {
-                        avgSize += new FileInfo(filePath).Length;
-                        count++;
+                        await _downloader.DownloadFileTaskAsync(
+                            fallbackUrls[retryCount % fallbackUrls.Length],
+                            exePath
+                        );
+
+                        if (File.Exists(exePath))
+                        {
+                            downloaded = true;
+                            if (Debug.Enabled())
+                                Terminal.Debug($"Downloaded 7za.exe to: {exePath}");
+                        }
+                        else
+                        {
+                            Terminal.Error($"Failed to download 7za.exe! Trying again... (Attempt {retryCount + 1})");
+                            retryCount++;
+                        }
                     }
+                    catch (Exception ex)
+                    {
+                        if (Debug.Enabled())
+                            Terminal.Debug($"Failed to download 7za.exe: {ex.Message}");
+                        retryCount++;
+                    }
+
+                    if (retryCount > 0)
+                        await Task.Delay(1000);
                 }
-                if (count > 0)
+                else
                 {
-                    avgSize /= count;
-                    if (avgSize < 10240) return 50;       // < 10KB
-                    if (avgSize < 102400) return 25;      // < 100KB
-                    if (avgSize < 1048576) return 10;     // < 1MB
-                    return 2;                             // larger files
+                    downloaded = true;
                 }
             }
-            catch
+
+            if (!downloaded)
             {
-                // if anything goes wrong, use default
-                return 1;
+                Terminal.Error("Couldn't download 7za.exe! Launcher will close in 5 seconds...");
+                await Task.Delay(5000);
+                Environment.Exit(1);
             }
-            return 2;  // default for game files
-        }*/
+        }
 
         private static async Task Extract7z(string archivePath, string outputPath)
         {
@@ -188,77 +495,37 @@ namespace Launcher.Utils
                     return;
                 }
 
+                await Download7za();
+
                 string? launcherDir = Path.GetDirectoryName(Environment.ProcessPath);
                 if (launcherDir == null)
                 {
                     throw new InvalidOperationException("Could not determine launcher directory");
                 }
 
-                string launcherDllPath = Path.Combine(launcherDir, "7z.dll");
-                bool dllDownloaded = false;
-                int retryCount = 0;
-                string[] fallbackUrls = new[]
-                {
-                    "https://ollumhd.github.io/7z.dll",
-                    "https://fastdl.classiccounter.cc/7z.dll"
-                    // add more fallback URLs if needed...
-                };
+                string exePath = Path.Combine(launcherDir, "7za.exe");
 
-                while (!dllDownloaded && retryCount < 10)
+                using (var process = new Process())
                 {
-                    if (!File.Exists(launcherDllPath))
+                    process.StartInfo = new ProcessStartInfo
                     {
-                        if (Debug.Enabled())
-                            Terminal.Debug($"7z.dll not found, downloading... (Attempt {retryCount + 1}/10)");
+                        FileName = exePath,
+                        Arguments = $"x \"{archivePath}\" -o\"{Path.GetDirectoryName(outputPath)}\" -y",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true
+                    };
 
-                        try
-                        {
-                            await _downloader.DownloadFileTaskAsync(
-                                fallbackUrls[retryCount % fallbackUrls.Length],
-                                launcherDllPath
-                            );
-
-                            if (File.Exists(launcherDllPath))
-                            {
-                                dllDownloaded = true;
-                                if (Debug.Enabled())
-                                    Terminal.Debug($"Downloaded 7z.dll to: {launcherDllPath}");
-                            }
-                            else
-                            {
-                                Terminal.Error($"Failed to download 7z.dll! Trying again... (Attempt {retryCount + 1})");
-                                retryCount++;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            if (Debug.Enabled())
-                                Terminal.Debug($"Failed to download 7z.dll: {ex.Message}");
-                            retryCount++;
-                        }
-
-                        if (retryCount > 0)
-                            await Task.Delay(1000); // wait 1 sec per retry
-                    }
-                    else
-                    {
-                        dllDownloaded = true;
-                    }
-                }
-
-                if (!dllDownloaded)
-                {
-                    Terminal.Error("Couldn't download 7z.dll! Launcher will close in 5 seconds...");
-                    await Task.Delay(5000);
-                    Environment.Exit(1);
-                }
-
-                using (var archiveFile = new ArchiveFile(archivePath, launcherDllPath))
-                {
                     if (Debug.Enabled())
                         Terminal.Debug($"Starting extraction...");
 
-                    await Task.Run(() => archiveFile.Extract(Path.GetDirectoryName(outputPath)));
+                    process.Start();
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode != 0)
+                    {
+                        throw new Exception($"7za extraction failed with exit code: {process.ExitCode}");
+                    }
 
                     if (Debug.Enabled())
                         Terminal.Debug("Extraction completed successfully!");
@@ -307,11 +574,32 @@ namespace Launcher.Utils
                             Terminal.Debug($"Failed to delete .7z file {file}: {ex.Message}");
                     }
                 }
+
+                // Delete 7za.exe if it exists
+                string? launcherDir = Path.GetDirectoryName(Environment.ProcessPath);
+                if (launcherDir != null)
+                {
+                    string sevenZaPath = Path.Combine(launcherDir, "7za.exe");
+                    if (File.Exists(sevenZaPath))
+                    {
+                        try
+                        {
+                            File.Delete(sevenZaPath);
+                            if (Debug.Enabled())
+                                Terminal.Debug("Deleted 7za.exe");
+                        }
+                        catch (Exception ex)
+                        {
+                            if (Debug.Enabled())
+                                Terminal.Debug($"Failed to delete 7za.exe: {ex.Message}");
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
                 if (Debug.Enabled())
-                    Terminal.Debug($"Failed to perform .7z cleanup: {ex.Message}");
+                    Terminal.Debug($"Failed to perform cleanup: {ex.Message}");
             }
         }
     }

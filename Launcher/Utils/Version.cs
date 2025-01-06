@@ -4,7 +4,7 @@ namespace Launcher.Utils
 {
     public static class Version
     {
-        public static string Current = "2.2.0";
+        public static string Current = "2.2.1";
 
         public async static Task<string> GetLatestVersion()
         {
