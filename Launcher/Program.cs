@@ -86,7 +86,7 @@ if (!File.Exists($"{directory}/csgo.exe"))
 {
     Terminal.Error("(!) csgo.exe not found in the current directory!");
     Terminal.Warning($"Game files will be installed to: {directory}");
-    Terminal.Warning("This will download approximately 15GB of data. Make sure you have enough disk space.");
+    Terminal.Warning("This will download approximately 7GB of data. Make sure you have enough disk space.");
     AnsiConsole.Markup($"[orange1]Classic[/][blue]Counter[/] [grey50]|[/] [grey82]Would you like to download the full game? (y/n): [/]");
 
     var response = Console.ReadKey(true);
