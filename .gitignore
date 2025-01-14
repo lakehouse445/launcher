@@ -400,3 +400,4 @@ FodyWeavers.xsd
 *.sln.iml
 
 publish/*
+.DS_Store
