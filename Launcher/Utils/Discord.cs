@@ -9,7 +9,7 @@ namespace Launcher.Utils
         private static readonly string _appId = "1133457462024994947";
         private static DiscordRpcClient _client = new DiscordRpcClient(_appId);
         private static RichPresence _presence = new RichPresence();
-        public static bool IsWhitelisted { get; private set; } = false;
+        public static string? CurrentUserId { get; private set; } // for whitelist check
 
         public static void Init()
         {
@@ -57,20 +57,10 @@ namespace Launcher.Utils
 
         private static async void OnReady(object sender, ReadyMessage e)
         {
+            CurrentUserId = e.User.ID.ToString(); // for passing current uid to api
+
             if (Debug.Enabled())
                 Terminal.Debug($"Discord RPC: User is ready => @{e.User.Username} ({e.User.ID})");
-
-            try
-            {
-                var response = await Api.Whitelist.CheckWhitelist(e.User.ID.ToString());
-                IsWhitelisted = response.IsWhitelisted;
-            }
-            catch (Exception ex)
-            {
-                if (Debug.Enabled())
-                    Terminal.Debug($"Failed to check whitelist status: {ex.Message}");
-                IsWhitelisted = false;
-            }
         }
     }
 }

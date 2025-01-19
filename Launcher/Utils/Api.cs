@@ -32,20 +32,8 @@ namespace Launcher.Utils
         Task<string> GetFullGameValidate();
 
         [Headers("User-Agent: ClassicCounter Launcher")]
-        [Get("/game/full")]
-        Task<FullGameDownloadResponse> GetFullGameDownload();
-    }
-
-    public interface IOllumCC
-    {
-        [Headers("User-Agent: ClassicCounter Launcher")]
-        [Get("/whitelisted.php?id={userId}")]
-        Task<WhitelistResponse> CheckWhitelist(string userId);
-    }
-
-    public class WhitelistResponse
-    {
-        public required bool IsWhitelisted { get; set; }
+        [Get("/game/full?discord_id={discordId}")]
+        Task<FullGameDownloadResponse> GetFullGameDownload(string discordId);
     }
 
     public static class Api
@@ -53,6 +41,5 @@ namespace Launcher.Utils
         private static RefitSettings _settings = new RefitSettings(new NewtonsoftJsonContentSerializer());
         public static IGitHub GitHub = RestService.For<IGitHub>("https://api.github.com", _settings);
         public static IClassicCounter ClassicCounter = RestService.For<IClassicCounter>("https://classiccounter.cc/api", _settings);
-        public static IOllumCC Whitelist = RestService.For<IOllumCC>("https://ollum.cc/api", _settings);
     }
 }

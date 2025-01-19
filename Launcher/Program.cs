@@ -1,4 +1,5 @@
 ﻿using Launcher.Utils;
+using Refit;
 using Spectre.Console;
 using System.Diagnostics;
 
@@ -104,21 +105,12 @@ if (!File.Exists($"{directory}/csgo.exe"))
         var response = Console.ReadKey(true);
         Console.WriteLine(response.KeyChar);
         Console.WriteLine();
+
         if (char.ToLower(response.KeyChar) == 'y')
         {
-            if (!Discord.IsWhitelisted)
-            {
-                Terminal.Error("You are not whitelisted on ClassicCounter! (https://classiccounter.cc/whitelist)");
-                Terminal.Error("If you are whitelisted, check if Discord is open and if you're logged into the whitelisted account.");
-                Terminal.Error("If you're still facing issues, use one of our other download links to download the game.");
-                Terminal.Warning("Closing launcher in 10 seconds...");
-                await Task.Delay(10000);
-                Environment.Exit(1);
-            }
-
-            // Check available disk space
             DriveInfo driveInfo = new DriveInfo(Path.GetPathRoot(directory));
             long requiredSpace = 24L * 1024 * 1024 * 1024; // 24 GB in bytes
+
             if (driveInfo.AvailableFreeSpace < requiredSpace)
             {
                 Terminal.Error("(!) Not enough disk space available!");
@@ -128,6 +120,7 @@ if (!File.Exists($"{directory}/csgo.exe"))
                 Environment.Exit(1);
                 return;
             }
+
             await AnsiConsole
             .Status()
             .SpinnerStyle(Style.Parse("gray"))

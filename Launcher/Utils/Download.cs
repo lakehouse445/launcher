@@ -126,15 +126,17 @@ namespace Launcher.Utils
         {
             try
             {
-                var gameFiles = await Api.ClassicCounter.GetFullGameDownload();
-
-                if (gameFiles?.Files == null || gameFiles.Files.Count == 0)
+                if (string.IsNullOrEmpty(Discord.CurrentUserId))
                 {
-                    Terminal.Error("No files received from API. Closing launcher in 5 seconds...");
+                    Terminal.Error("Discord not connected. Please make sure Discord is running.");
+                    Terminal.Error("Closing launcher in 5 seconds...");
                     await Task.Delay(5000);
                     Environment.Exit(1);
                     return;
                 }
+
+                // pass discord id to api
+                var gameFiles = await Api.ClassicCounter.GetFullGameDownload(Discord.CurrentUserId);
 
                 int totalFiles = gameFiles.Files.Count;
                 int completedFiles = 0;
@@ -210,6 +212,15 @@ namespace Launcher.Utils
                     await Task.Delay(5000);
                     Environment.Exit(1);
                 }
+            }
+            catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                Terminal.Error("You are not whitelisted on ClassicCounter! (https://classiccounter.cc/whitelist)");
+                Terminal.Error("If you are whitelisted, check if Discord is open and if you're logged into the whitelisted account.");
+                Terminal.Error("If you're still facing issues, use one of our other download links to download the game.");
+                Terminal.Warning("Closing launcher in 10 seconds...");
+                await Task.Delay(10000);
+                Environment.Exit(1);
             }
             catch (ApiException ex)
             {
