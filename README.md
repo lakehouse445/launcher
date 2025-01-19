@@ -13,7 +13,7 @@
 [![MIT License][license-shield]][license-url]
 
 > [!IMPORTANT]
-> .NET Runtime 8 is needed to run the launcher. Download it from [**here**](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-8.0.11-windows-x64-installer).
+> .NET Runtime 8 is required to run the launcher. Download it from [**here**](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-8.0.11-windows-x64-installer).
 
 ## Arguments
 - `--debug-mode` - Enables debug mode, prints additional info.
