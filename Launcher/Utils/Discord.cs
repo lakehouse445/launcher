@@ -55,7 +55,7 @@ namespace Launcher.Utils
             _presence.Assets.SmallImageKey = key;
         }
 
-        private static async void OnReady(object sender, ReadyMessage e)
+        private static void OnReady(object sender, ReadyMessage e)
         {
             CurrentUserId = e.User.ID.ToString(); // for passing current uid to api
 
