@@ -84,31 +84,9 @@ if (!Argument.Exists("--skip-updates"))
 string directory = Directory.GetCurrentDirectory();
 if (!File.Exists($"{directory}/csgo.exe"))
 {
-    Terminal.Error("(!) csgo.exe not found in the current directory!");
-    Terminal.Warning($"Game files will be installed to: {directory}");
-    Terminal.Warning("This will download approximately 7GB of data. Make sure you have enough disk space.");
-    AnsiConsole.Markup($"[orange1]Classic[/][blue]Counter[/] [grey50]|[/] [grey82]Would you like to download the full game? (y/n): [/]");
-
-    var response = Console.ReadKey(true);
-    Console.WriteLine(response.KeyChar);
-    Console.WriteLine();
-
-    if (char.ToLower(response.KeyChar) == 'y')
+    // if there's a .7z.001 file, start downloading
+    if (Directory.GetFiles(directory, "*.7z.001").Length > 0)
     {
-        // Check available disk space
-        DriveInfo driveInfo = new DriveInfo(Path.GetPathRoot(directory));
-        long requiredSpace = 24L * 1024 * 1024 * 1024; // 24 GB in bytes
-
-        if (driveInfo.AvailableFreeSpace < requiredSpace)
-        {
-            Terminal.Error("(!) Not enough disk space available!");
-            Terminal.Error($"Required: 24 GB, Available: {driveInfo.AvailableFreeSpace / (1024.0 * 1024 * 1024):F2} GB");
-            Terminal.Error("Please free up some disk space and try again. Closing launcher in 10 seconds...");
-            await Task.Delay(10000);
-            Environment.Exit(1);
-            return;
-        }
-
         await AnsiConsole
         .Status()
         .SpinnerStyle(Style.Parse("gray"))
@@ -119,9 +97,51 @@ if (!File.Exists($"{directory}/csgo.exe"))
     }
     else
     {
-        Terminal.Error("Game files are required to run ClassicCounter. Closing launcher in 10 seconds...");
-        await Task.Delay(10000);
-        Environment.Exit(1);
+        Terminal.Error("(!) csgo.exe not found in the current directory!");
+        Terminal.Warning($"Game files will be installed to: {directory}");
+        Terminal.Warning("This will download approximately 7GB of data. Make sure you have enough disk space.");
+        AnsiConsole.Markup($"[orange1]Classic[/][blue]Counter[/] [grey50]|[/] [grey82]Would you like to download the full game? (y/n): [/]");
+        var response = Console.ReadKey(true);
+        Console.WriteLine(response.KeyChar);
+        Console.WriteLine();
+        if (char.ToLower(response.KeyChar) == 'y')
+        {
+            if (!Discord.IsWhitelisted)
+            {
+                Terminal.Error("You are not whitelisted on ClassicCounter! (https://classiccounter.cc/whitelist)");
+                Terminal.Error("If you are whitelisted, check if Discord is open and if you're logged into the whitelisted account.");
+                Terminal.Error("If you're still facing issues, use one of our other download links to download the game.");
+                Terminal.Warning("Closing launcher in 10 seconds...");
+                await Task.Delay(10000);
+                Environment.Exit(1);
+            }
+
+            // Check available disk space
+            DriveInfo driveInfo = new DriveInfo(Path.GetPathRoot(directory));
+            long requiredSpace = 24L * 1024 * 1024 * 1024; // 24 GB in bytes
+            if (driveInfo.AvailableFreeSpace < requiredSpace)
+            {
+                Terminal.Error("(!) Not enough disk space available!");
+                Terminal.Error($"Required: 24 GB, Available: {driveInfo.AvailableFreeSpace / (1024.0 * 1024 * 1024):F2} GB");
+                Terminal.Error("Please free up some disk space and try again. Closing launcher in 10 seconds...");
+                await Task.Delay(10000);
+                Environment.Exit(1);
+                return;
+            }
+            await AnsiConsole
+            .Status()
+            .SpinnerStyle(Style.Parse("gray"))
+            .StartAsync("Downloading full game...", async ctx =>
+            {
+                await DownloadManager.DownloadFullGame(ctx);
+            });
+        }
+        else
+        {
+            Terminal.Error("Game files are required to run ClassicCounter. Closing launcher in 10 seconds...");
+            await Task.Delay(10000);
+            Environment.Exit(1);
+        }
     }
 }
 
