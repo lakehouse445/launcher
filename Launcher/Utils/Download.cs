@@ -127,9 +127,9 @@ namespace Launcher.Utils
             try
             {
                 await Steam.GetRecentLoggedInSteamID();
-                if (string.IsNullOrEmpty(Steam.recentSteamID))
+                if (string.IsNullOrEmpty(Steam.recentSteamID2))
                 {
-                    Terminal.Error("Discord not connected. Please make sure Discord is running.");
+                    Terminal.Error("Steam does not seem to be installed. Please make sure that you have Steam installed.");
                     Terminal.Error("Closing launcher in 5 seconds...");
                     await Task.Delay(5000);
                     Environment.Exit(1);
@@ -137,7 +137,7 @@ namespace Launcher.Utils
                 }
 
                 // pass steam id to api
-                var gameFiles = await Api.ClassicCounter.GetFullGameDownload(Steam.recentSteamID);
+                var gameFiles = await Api.ClassicCounter.GetFullGameDownload(Steam.recentSteamID2);
 
                 int totalFiles = gameFiles.Files.Count;
                 int completedFiles = 0;
@@ -217,7 +217,7 @@ namespace Launcher.Utils
             catch (ApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 Terminal.Error("You are not whitelisted on ClassicCounter! (https://classiccounter.cc/whitelist)");
-                Terminal.Error("If you are whitelisted, check if Discord is open and if you're logged into the whitelisted account.");
+                Terminal.Error("If you are whitelisted, check if you have Steam installed and that you're logged into the whitelisted account.");
                 Terminal.Error("If you're still facing issues, use one of our other download links to download the game.");
                 Terminal.Warning("Closing launcher in 10 seconds...");
                 await Task.Delay(10000);
