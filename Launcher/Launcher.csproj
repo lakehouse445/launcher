@@ -14,6 +14,8 @@
     <Product>ClassicCounter Launcher</Product>
     <Authors>ClassicCounter Team</Authors>
 
+    <NoWarn>NU1701</NoWarn> <!-- shut stupid CSGSI warning -->
+
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

@@ -9,7 +9,7 @@ namespace Launcher.Utils
         public static string? recentSteamID2 { get; private set; }
 
         private static string? steamPath { get; set; }
-        private static async Task GetSteamInstallPath()
+        private static string? GetSteamInstallPath()
         {
             using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
             {
@@ -18,12 +18,13 @@ namespace Launcher.Utils
                     steamPath = key?.GetValue("InstallPath") as string;
                     if (Debug.Enabled())
                         Terminal.Debug($"Steam folder found at {steamPath}");
+                    return steamPath;
                 }
             }
         }
         public static async Task GetRecentLoggedInSteamID()
         {
-            await GetSteamInstallPath();
+            steamPath = GetSteamInstallPath();
             if (string.IsNullOrEmpty(steamPath))
             {
                 Terminal.Error("Your Steam install couldn't be found.");
